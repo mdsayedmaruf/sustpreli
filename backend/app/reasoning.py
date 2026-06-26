@@ -93,7 +93,8 @@ _KW = {
         "wrong number", "wrong person", "wrong recipient", "wrong account",
         "wrong transfer", "sent to wrong", "didn't get", "did not get",
         "didn't receive", "did not receive", "hasn't received", "haven't received",
-        "not received", "ভুল নম্বর", "ভুল মানুষ", "পায়নি", "আসেনি", "পাইনি",
+        "not received", "never received", "never got", "never arrived", "didn't arrive",
+        "did not arrive", "ভুল নম্বর", "ভুল মানুষ", "পায়নি", "আসেনি", "পাইনি",
     ],
     "refund": [
         "refund", "changed my mind", "change my mind", "don't want", "do not want",
