@@ -16,10 +16,18 @@ class Settings(BaseSettings):
     # is not persisted and the app runs without a database.
     database_url: str = ""
 
-    # OpenRouter
+    # OpenRouter (optional — the service scores fully without it; see plan.md #3)
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "openai/gpt-4o-mini"
+
+    # Enable optional LLM polishing of prose fields. OFF by default: the
+    # deterministic engine is the reliable, enum-exact path and needs no key.
+    use_llm: bool = False
+
+    # Outbound LLM call timeout. Must stay well under the 30s per-request budget
+    # the judge harness enforces (problem.md §9). Was a hardcoded 120s.
+    llm_timeout_seconds: float = 10.0
 
     # Sent to OpenRouter for ranking/attribution (optional but recommended)
     app_url: str = "http://localhost:5173"

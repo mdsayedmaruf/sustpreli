@@ -1,9 +1,12 @@
 import json
+import logging
 from collections.abc import AsyncIterator
 
 import httpx
 
 from .config import Settings
+
+logger = logging.getLogger("queuestorm.openrouter")
 
 
 class OpenRouterError(Exception):
@@ -48,21 +51,26 @@ async def chat_completion(
 ) -> tuple[str, str]:
     """Non-streaming completion. Returns (reply_text, model_used)."""
     payload = _payload(settings, messages, model, temperature, stream=False)
-    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_timeout_seconds)) as client:
         resp = await client.post(
             f"{settings.openrouter_base_url}/chat/completions",
             headers=_headers(settings),
             json=payload,
         )
     if resp.status_code != 200:
-        raise OpenRouterError(f"OpenRouter error {resp.status_code}: {resp.text}")
+        # Do NOT echo resp.text — an upstream error body can contain the request
+        # (and thus secrets). Log the detail server-side; raise a generic error.
+        logger.warning("OpenRouter HTTP %s on chat_completion", resp.status_code)
+        raise OpenRouterError(f"OpenRouter request failed with status {resp.status_code}.")
 
     data = resp.json()
     try:
         reply = data["choices"][0]["message"]["content"]
         used_model = data.get("model", payload["model"])
     except (KeyError, IndexError) as exc:
-        raise OpenRouterError(f"Unexpected OpenRouter response: {data}") from exc
+        # Don't reflect the raw body (may carry secrets); log it, raise generic.
+        logger.warning("Unexpected OpenRouter response shape on chat_completion")
+        raise OpenRouterError("Unexpected response from OpenRouter.") from exc
     return reply, used_model
 
 
@@ -74,7 +82,7 @@ async def stream_chat_completion(
 ) -> AsyncIterator[str]:
     """Streaming completion. Yields content text chunks as they arrive."""
     payload = _payload(settings, messages, model, temperature, stream=True)
-    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_timeout_seconds)) as client:
         async with client.stream(
             "POST",
             f"{settings.openrouter_base_url}/chat/completions",
@@ -82,9 +90,10 @@ async def stream_chat_completion(
             json=payload,
         ) as resp:
             if resp.status_code != 200:
-                body = await resp.aread()
+                await resp.aread()
+                logger.warning("OpenRouter HTTP %s on stream_chat_completion", resp.status_code)
                 raise OpenRouterError(
-                    f"OpenRouter error {resp.status_code}: {body.decode(errors='ignore')}"
+                    f"OpenRouter request failed with status {resp.status_code}."
                 )
 
             async for line in resp.aiter_lines():
