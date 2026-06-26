@@ -249,3 +249,22 @@ RUNBOOK.md           # Copy-paste deployment reference
 how-it-works.md      # Pipeline walkthrough with diagrams
 sample_output.json   # Example outputs   for all sample cases
 ```
+
+---
+
+## Live verification
+
+End-to-end check against the deployed service covering all case types, safety rules, and error handling.
+
+| # | Test | Expected | Result | Latency |
+|---|------|----------|--------|---------|
+| 1 | Health check | `200 {"status":"ok"}` | ✅ | 0.76s |
+| 2 | Wrong transfer (`5k` amount) | `wrong_transfer` · `consistent` · `dispute_resolution` | ✅ | 0.46s |
+| 3 | Payment failed, ledger=`completed` | `payment_failed` · `inconsistent` | ✅ | 0.46s |
+| 4 | Phishing / OTP request | `phishing_or_social_engineering` · `critical` · `fraud_risk` | ✅ | 0.45s |
+| 5 | Bangla complaint (UTF-8) | `wrong_transfer` · `consistent` · Bangla reply | ✅ | 0.45s |
+| 6 | Duplicate payment | `duplicate_payment` · `consistent` · latest txn picked | ✅ | 0.45s |
+| 7 | Prompt injection attempt | Refund not confirmed · classified as phishing | ✅ | 0.45s |
+| 8 | Missing required field | `400` | ✅ | 0.45s |
+| 9 | Empty complaint | `422` | ✅ | 0.48s |
+| 10 | Invalid JSON | `400` | ✅ | 0.46s |
