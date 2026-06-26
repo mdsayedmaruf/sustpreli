@@ -11,9 +11,8 @@ Design choice (see plan.md Risks #3): the structured decisions —
 not a free-form LLM. That guarantees enum-exact output, sub-second latency, and
 reproducible safety, none of which an LLM can guarantee. An LLM is *not* required
 to score well (problem.md §12), and no API credits are provided. The prose fields
-are produced by safe templates and may optionally be polished by an LLM behind a
-schema-validating fallback (see ``llm.py``); the deterministic result is always a
-complete, valid response on its own.
+are produced by safe templates; the deterministic result is always a complete,
+valid response on its own, with no outbound call on the analysis path.
 
 Calibrated against the 10 public sample cases in SUST_Preli_Sample_Cases.json.
 """

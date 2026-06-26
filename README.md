@@ -113,12 +113,8 @@ deterministic rule engine:
 - **Latency:** every sample case responds in well under a second (see
   `tests/reliability/test_analyze_latency_under_budget`), comfortably inside the 30s
   budget with no timeout exposure.
-- **Optional LLM polish:** the codebase retains an OpenRouter client and a `USE_LLM`
-  flag (off by default) for optionally rewriting *prose* fields only. It is gated behind
-  a schema-validating fallback so a slow/failed call can never break the contract or the
-  30s budget. If enabled, the model is configurable via `OPENROUTER_MODEL` (default
-  `openai/gpt-4o-mini`, chosen for low cost). The structured decisions are always made
-  deterministically regardless.
+- **No outbound calls:** the analysis path makes no network request at all, so there is
+  no API key to manage and no external dependency that can fail or add latency.
 
 ## Assumptions
 

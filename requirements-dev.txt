@@ -1,3 +1,5 @@
 # Test/dev dependencies (not needed to run the service).
 -r backend/requirements.txt
 pytest==8.3.4
+# FastAPI's TestClient (Starlette) requires httpx; runtime does not.
+httpx==0.28.1

@@ -1,22 +1,14 @@
-# Render Blueprint — deploys the FastAPI backend.
+# Render Blueprint — deploys the QueueStorm Investigator FastAPI service.
 # In the Render dashboard: New + > Blueprint, point it at this repo.
 services:
   - type: web
-    name: chatbot-backend
+    name: queuestorm-investigator
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
     plan: free
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     envVars:
-      - key: OPENROUTER_API_KEY
-        sync: false # set this in the Render dashboard (secret)
-      - key: DATABASE_URL
-        sync: false # set this in the Render dashboard (secret) for chat history
-      - key: OPENROUTER_MODEL
-        value: openai/gpt-4o-mini
-      - key: APP_TITLE
-        value: Hackathon Chatbot
+      # The service is self-contained (no DB, no API key). CORS is the only knob.
       - key: CORS_ORIGINS
-        # Replace with your Vercel domain after deploying the frontend.
         value: "*"
