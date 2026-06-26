@@ -8,10 +8,10 @@ A deterministic API service that triages digital-finance support tickets. Given 
 
 | | |
 |---|---|
-| Base URL | `https://sustpreli-production-56d0.up.railway.app` |
-| Health | `GET /health` → `{"status":"ok"}` |
+| Base URL | [https://sustpreli-production-56d0.up.railway.app](https://sustpreli-production-56d0.up.railway.app) |
+| Health | [/health](https://sustpreli-production-56d0.up.railway.app/health) → `{"status":"ok"}` |
 | Analyze | `POST /analyze-ticket` |
-| Docker image | `docker pull maruf52230/queuestorm-investigator:latest` |
+| Docker image | [maruf52230/queuestorm-investigator](https://hub.docker.com/r/maruf52230/queuestorm-investigator) |
 
 ```bash
 curl https://sustpreli-production-56d0.up.railway.app/health
@@ -135,7 +135,7 @@ Every customer-facing field passes through `backend/app/safety.py` as defense-in
 | Schema validation | Pydantic v2 |
 | Server | Uvicorn (2 workers) |
 | Testing | Pytest — 102 tests |
-| Deployment | Railway |
+| Deployment | [Railway](https://sustpreli-production-56d0.up.railway.app) |
 | Container | Docker (`python:3.12-slim`, non-root user) |
 
 No database. No GPU. No outbound network call on the analysis path. Zero inference cost.
@@ -230,6 +230,6 @@ backend/
   Dockerfile
 tests/               # 102 Pytest tests
 docker-compose.yml
-RUNBOOK.md           # Copy-paste deployment reference
+RUNBOOK.md           # Copy-paste deployment reference (see also: [how-it-works.html](./how-it-works.html))
 sample_output.json   # Example outputs   for all sample cases
 ```
