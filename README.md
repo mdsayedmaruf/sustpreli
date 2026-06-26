@@ -1,328 +1,235 @@
-# 🚀 QueueStorm Investigator
+# QueueStorm Investigator
 
-### AI/API SupportOps Challenge – SUST CSE Carnival 2026
-
-A fast, deterministic API that investigates digital finance support tickets by combining customer complaints with transaction history.
-
-Unlike a traditional classifier, QueueStorm **reasons from evidence**. It identifies the relevant transaction, determines whether the complaint is supported by the available data, routes the case to the correct department, and generates a safe, professional customer response.
+A deterministic API service that triages digital-finance support tickets. Given a customer complaint and a short snippet of that customer's recent transaction history, it identifies the relevant transaction, evaluates whether the data supports the claim, routes the case to the correct team, and generates a safe customer reply — all in under 100 ms with no external dependencies.
 
 ---
 
-## ✨ Key Features
+## Live service
 
-* ⚡ Deterministic evidence reasoning
-* 🔍 Transaction matching from complaint + history
-* 🛡️ Built-in fintech safety guardrails
-* 🌐 English & Bangla complaint support
-* 📄 Strict JSON schema compliance
-* 🚀 Zero external dependencies during inference
-* 💰 $0 inference cost
-* 🧪 102 automated tests
-
----
-
-# 🌐 Live Demo
-
-| Service        | URL                                                     |
-| -------------- | ------------------------------------------------------- |
-| Base URL       | https://chatbot-backend-production-7fe7.up.railway.app  |
-| Health Check   | `/health`                                               |
-| Analyze Ticket | `POST /analyze-ticket`                                  |
-| Docker Image   | `docker pull maruf52230/queuestorm-investigator:latest` |
-
-Health endpoint:
+| | |
+|---|---|
+| Base URL | `https://chatbot-backend-production-7fe7.up.railway.app` |
+| Health | `GET /health` → `{"status":"ok"}` |
+| Analyze | `POST /analyze-ticket` |
+| Docker image | `docker pull maruf52230/queuestorm-investigator:latest` |
 
 ```bash
 curl https://chatbot-backend-production-7fe7.up.railway.app/health
+# {"status":"ok"}
 ```
 
-Response
+---
+
+## API
+
+### `POST /analyze-ticket`
+
+**Request**
 
 ```json
 {
-  "status":"ok"
-}
-```
-
----
-
-# 🏗 Architecture
-
-```text
-Client
-   │
-   ▼
-FastAPI
-   │
-   ▼
-Input Validation
-   │
-   ▼
-Evidence Reasoning Engine
-   │
-   ├── Complaint Classification
-   ├── Transaction Matching
-   ├── Evidence Verification
-   ├── Department Routing
-   ├── Severity Assignment
-   └── Human Review Decision
-   │
-   ▼
-Safety Guard
-   │
-   ▼
-JSON Response
-```
-
----
-
-# 🧠 Reasoning Pipeline
-
-The service follows five deterministic steps.
-
-### 1. Complaint Classification
-
-Detects:
-
-* Wrong Transfer
-* Payment Failed
-* Refund Request
-* Duplicate Payment
-* Merchant Settlement Delay
-* Agent Cash-in Issue
-* Phishing / Social Engineering
-* Other
-
-Supports:
-
-* English
-* Bangla
-* Banglish
-
----
-
-### 2. Evidence Matching
-
-Finds the transaction referred to by the complaint using:
-
-* Amount
-* Time
-* Counterparty
-* Transaction type
-* Status
-
-Normalizes:
-
-* Bangla numerals
-* 5k / 5 thousand / ৫ লাখ
-* Mixed-language complaints
-
----
-
-### 3. Evidence Verification
-
-Returns one of:
-
-* consistent
-* inconsistent
-* insufficient_data
-
-The system **never guesses** when evidence is missing.
-
----
-
-### 4. Routing
-
-Determines
-
-* Department
-* Severity
-* Human Review Requirement
-
-using deterministic rules.
-
----
-
-### 5. Safe Response Generation
-
-Produces
-
-* Agent Summary
-* Recommended Next Action
-* Customer Reply
-
-using safe templates.
-
----
-
-# 🛡 Safety Guardrails
-
-Every response is validated before being returned.
-
-✔ Never asks for
-
-* OTP
-* PIN
-* Password
-* Full Card Number
-
-✔ Never promises
-
-* Refund
-* Reversal
-* Account Unblock
-
-✔ Ignores prompt injection
-
-✔ Directs users only to official support channels
-
----
-
-# ⚙ Technology Stack
-
-| Component  | Technology  |
-| ---------- | ----------- |
-| Backend    | FastAPI     |
-| Language   | Python 3.12 |
-| Validation | Pydantic v2 |
-| Server     | Uvicorn     |
-| Testing    | Pytest      |
-| Deployment | Railway     |
-| Container  | Docker      |
-
----
-
-# 🚀 Running Locally
-
-## Docker
-
-```bash
-docker pull maruf52230/queuestorm-investigator:latest
-
-docker run --rm -p 8000:8000 maruf52230/queuestorm-investigator:latest
-```
-
----
-
-## Python
-
-```bash
-cd backend
-
-pip install -r requirements.txt
-
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
----
-
-# 📬 Example Request
-
-```json
-{
-  "ticket_id":"TKT-001",
-  "complaint":"I sent 5000 taka to the wrong number.",
-  "transaction_history":[
+  "ticket_id": "TKT-001",
+  "complaint": "I sent 5000 taka to the wrong number.",
+  "language": "en",
+  "transaction_history": [
     {
-      "transaction_id":"TXN-9101",
-      "amount":5000,
-      "status":"completed"
+      "transaction_id": "TXN-9101",
+      "timestamp": "2026-04-14T14:08:22Z",
+      "type": "transfer",
+      "amount": 5000,
+      "counterparty": "+8801719876543",
+      "status": "completed"
     }
   ]
 }
 ```
 
----
+`ticket_id` and `complaint` are required. `transaction_history`, `language`, `channel`,
+`user_type`, `campaign_context`, and `metadata` are optional.
 
-# ✅ Example Response
+**Response**
 
 ```json
 {
-  "ticket_id":"TKT-001",
-  "relevant_transaction_id":"TXN-9101",
-  "evidence_verdict":"consistent",
-  "case_type":"wrong_transfer",
-  "severity":"high",
-  "department":"dispute_resolution",
-  "agent_summary":"Customer reports the transaction was sent to the wrong recipient.",
-  "recommended_next_action":"Verify transaction details and initiate the dispute workflow.",
-  "customer_reply":"We have received your request and our support team will review it through official channels. Please do not share your PIN or OTP with anyone.",
-  "human_review_required":true,
-  "confidence":0.95
+  "ticket_id": "TKT-001",
+  "relevant_transaction_id": "TXN-9101",
+  "evidence_verdict": "consistent",
+  "case_type": "wrong_transfer",
+  "severity": "high",
+  "department": "dispute_resolution",
+  "agent_summary": "Customer reports TXN-9101 was sent to the wrong recipient.",
+  "recommended_next_action": "Verify TXN-9101 with the customer and proceed with the dispute workflow per policy.",
+  "customer_reply": "We have noted your concern about transaction TXN-9101. Our dispute team will review the case and contact you through official support channels. Please do not share your PIN or OTP with anyone.",
+  "human_review_required": true,
+  "confidence": 0.9,
+  "reason_codes": ["wrong_transfer", "transaction_match"]
 }
 ```
 
+**HTTP status codes**
+
+| Code | Meaning |
+|------|---------|
+| 200 | Successful analysis |
+| 400 | Malformed input — invalid JSON or missing required fields |
+| 422 | Schema-valid but semantically empty complaint |
+| 500 | Internal error — safe, non-sensitive message, no stack trace |
+
+The service never crashes on bad input.
+
+### `GET /health`
+
+Returns `{"status":"ok"}` with no I/O. Used as a readiness probe.
+
 ---
 
-# 🧪 Testing
+## How it works
+
+The reasoning is fully deterministic — no LLM, no external API call on the analysis path.
+
+**1. Classification**
+
+The complaint is scanned for keywords (English, Bangla, and Banglish) to determine one of eight case types: `wrong_transfer`, `payment_failed`, `refund_request`, `duplicate_payment`, `merchant_settlement_delay`, `agent_cash_in_issue`, `phishing_or_social_engineering`, or `other`. Safety-critical types are evaluated first.
+
+**2. Transaction matching**
+
+The customer's stated amount is extracted from the complaint and intersected against the supplied transaction history to identify `relevant_transaction_id`. Magnitude shorthand (`5k`, `5 thousand`, `৫ লাখ`) and Bangla numerals are normalised before matching. Long digit sequences (phone numbers) are excluded to avoid false matches.
+
+**3. Evidence verdict**
+
+The service determines whether the transaction data supports or contradicts the complaint:
+
+- `consistent` — the ledger entry supports the claim.
+- `inconsistent` — the data contradicts it (e.g. a "payment failed" complaint against a `completed` transaction, or a "wrong transfer" to a recipient the customer has paid repeatedly).
+- `insufficient_data` — no matching transaction found, or the match is ambiguous. The service does not guess.
+
+**4. Routing**
+
+Department, severity, and `human_review_required` are assigned by deterministic rules. Disputes, fraud cases, and duplicates are escalated; ambiguous cases without a matched transaction prompt clarification rather than escalation.
+
+**5. Response generation**
+
+`agent_summary`, `recommended_next_action`, and `customer_reply` are produced from safe templates and then independently validated by the safety layer before being returned.
+
+---
+
+## Safety guardrails
+
+Every customer-facing field passes through `backend/app/safety.py` as defense-in-depth on top of already-safe templates.
+
+| Rule | Enforcement |
+|------|-------------|
+| Never request PIN, OTP, password, or card number | Outgoing replies are scanned for solicitation patterns. Safe warning phrases ("do not share your PIN") are explicitly allowed. Complaint text is never echoed into output fields. |
+| Never confirm an unauthorized refund, reversal, or account unblock | Guaranteeing language is replaced with "any eligible amount will be returned through official channels". Applied to both `customer_reply` and `recommended_next_action`. |
+| Never redirect to a suspicious third party | Replies reference only official support channels. |
+| Prompt injection resistance | The engine never copies complaint text into output fields, so instructions embedded in a complaint have no surface to act on. |
+
+---
+
+## Tech stack
+
+| Component | Technology |
+|-----------|-----------|
+| Framework | FastAPI |
+| Language | Python 3.12 |
+| Schema validation | Pydantic v2 |
+| Server | Uvicorn (2 workers) |
+| Testing | Pytest — 102 tests |
+| Deployment | Railway |
+| Container | Docker (`python:3.12-slim`, non-root user) |
+
+No database. No GPU. No outbound network call on the analysis path. Zero inference cost.
+
+---
+
+## Running locally
+
+### Option 1 — Pull from Docker Hub
 
 ```bash
+docker pull maruf52230/queuestorm-investigator:latest
+docker run --rm -p 8000:8000 maruf52230/queuestorm-investigator:latest
+```
+
+If port 8000 is in use, map a different host port:
+
+```bash
+docker run --rm -p 8090:8000 maruf52230/queuestorm-investigator:latest
+```
+
+### Option 2 — Build and run with Docker Compose
+
+```bash
+docker compose up --build           # foreground
+docker compose up -d --build        # detached
+docker compose down                 # stop and remove
+
+HOST_PORT=8090 docker compose up    # if port 8000 is taken
+```
+
+Environment variables (all optional):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8000` | Port the app binds inside the container |
+| `HOST_PORT` | `8000` | Host port published by Docker Compose |
+| `WEB_CONCURRENCY` | `2` | Number of Uvicorn worker processes |
+| `CORS_ORIGINS` | `*` | Comma-separated origin allowlist, or `*` for all |
+
+### Option 3 — Python directly
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Verify:
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+```
+
+---
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
 pytest
 ```
 
-Coverage includes
-
-* API Contract
-* Evidence Reasoning
-* Hidden Edge Cases
-* Safety Validation
-* Robustness
-* Performance
-* Reliability
-
-**102 automated tests**
+102 tests covering API contract, evidence reasoning, amount parsing robustness, safety
+guardrails, and response-time reliability.
 
 ---
 
-# 💰 Models & Cost
+## Known limitations
 
-No external LLM is used.
-
-The solution is a deterministic rule engine.
-
-Benefits
-
-* Zero inference cost
-* No API keys
-* No network dependency
-* Extremely low latency
-* Fully reproducible outputs
+- Amounts must contain a digit. Digit forms, magnitude shorthand (`5k`, `৫ লাখ`), and Bangla
+  numerals are handled; fully written amounts ("five thousand") fall back to
+  `insufficient_data` rather than guess.
+- Complaint types outside the supported taxonomy are mapped to `other` / `customer_support`
+  with `insufficient_data`.
+- Bangla customer replies use fixed templates rather than generative text.
 
 ---
 
-# 📈 Performance
-
-* Average response time: **<100 ms**
-* No outbound network calls
-* Stateless API
-* Deterministic responses
-* Production-ready Docker image
-
----
-
-# Known Limitations
-
-* Fully written amounts ("five thousand") fall back to `insufficient_data`.
-* Unsupported complaint categories are safely mapped to `other`.
-* Bangla responses use deterministic templates instead of generative text.
-
----
-
-# Repository Structure
+## Repository layout
 
 ```
 backend/
-tests/
-sample_output.json
-RUNBOOK.md
-README.md
-Dockerfile
+  app/
+    main.py          # FastAPI app, endpoints, error handlers
+    reasoning.py     # Deterministic evidence-reasoning engine
+    safety.py        # Safety guardrails and output scanning
+    schemas.py       # Pydantic request/response models
+    config.py        # Settings (CORS, workers)
+  requirements.txt
+  Dockerfile
+tests/               # 102 Pytest tests
 docker-compose.yml
-requirements.txt
+RUNBOOK.md           # Copy-paste deployment reference
+sample_output.json   # Example outputs   for all sample cases
 ```
-
----
-
-# License
-
-Developed for the **SUST CSE Carnival 2026 – QueueStorm Investigator Hackathon**.

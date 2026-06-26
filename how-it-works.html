@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QueueStorm Investigator — How It Works</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --border:    #2a2f3f;
+    --accent:    #4f8ef7;
+    --accent2:   #38d9a9;
+    --accent3:   #f7c94f;
+    --danger:    #f75f5f;
+    --text:      #e2e6f0;
+    --muted:     #7a8099;
+    --code-bg:   #12151e;
+    --radius:    10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    padding: 48px 24px 80px;
+  }
+
+  .page { max-width: 860px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header { margin-bottom: 56px; }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -.4px;
+    color: #fff;
+  }
+  .header h1 span { color: var(--accent); }
+  .header p {
+    color: var(--muted);
+    margin-top: 8px;
+    max-width: 560px;
+    font-size: 14.5px;
+  }
+  .badge {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 4px 12px;
+    background: rgba(79,142,247,.12);
+    border: 1px solid rgba(79,142,247,.3);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: .4px;
+  }
+
+  /* ── Section title ── */
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* ── Pipeline ── */
+  .pipeline { display: flex; flex-direction: column; gap: 0; margin-bottom: 64px; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 0 20px;
+    position: relative;
+  }
+
+  /* vertical connector */
+  .step:not(:last-child) .step-line::after {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 40px;
+    width: 2px;
+    height: calc(100% - 16px);
+    background: var(--border);
+  }
+
+  .step-line { position: relative; }
+
+  .step-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-body { padding: 8px 0 40px; }
+  .step-body h3 { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 6px; line-height: 40px; }
+  .step-body p  { color: var(--muted); font-size: 14px; max-width: 580px; }
+
+  .step-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .tag {
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid transparent;
+  }
+
+  /* step colors */
+  .s1 .step-num { background: rgba(79,142,247,.15); color: var(--accent); border: 1px solid rgba(79,142,247,.3); }
+  .s1 .tag      { background: rgba(79,142,247,.08); border-color: rgba(79,142,247,.2); color: var(--accent); }
+
+  .s2 .step-num { background: rgba(56,217,169,.12); color: var(--accent2); border: 1px solid rgba(56,217,169,.25); }
+  .s2 .tag      { background: rgba(56,217,169,.08); border-color: rgba(56,217,169,.2); color: var(--accent2); }
+
+  .s3 .step-num { background: rgba(247,201,79,.1);  color: var(--accent3); border: 1px solid rgba(247,201,79,.25); }
+  .s3 .tag      { background: rgba(247,201,79,.08); border-color: rgba(247,201,79,.2); color: var(--accent3); }
+
+  .s4 .step-num { background: rgba(167,139,250,.12); color: #a78bfa; border: 1px solid rgba(167,139,250,.25); }
+  .s4 .tag      { background: rgba(167,139,250,.08); border-color: rgba(167,139,250,.2); color: #a78bfa; }
+
+  .s5 .step-num { background: rgba(247,95,95,.1);   color: var(--danger); border: 1px solid rgba(247,95,95,.25); }
+  .s5 .tag      { background: rgba(247,95,95,.08);  border-color: rgba(247,95,95,.2);  color: var(--danger); }
+
+  /* ── Flow diagram ── */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 36px 24px;
+    margin-bottom: 64px;
+    overflow-x: auto;
+  }
+  .diagram-wrap svg { display: block; margin: 0 auto; }
+
+  /* ── Verdict cards ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 64px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 20px 18px;
+  }
+  .card-label { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 8px; }
+  .card h4 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+  .card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .card-consistent  .card-label { color: var(--accent2); }
+  .card-inconsistent .card-label { color: var(--danger); }
+  .card-insufficient .card-label { color: var(--accent3); }
+  .card-consistent  { border-left: 3px solid var(--accent2); }
+  .card-inconsistent { border-left: 3px solid var(--danger); }
+  .card-insufficient { border-left: 3px solid var(--accent3); }
+
+  /* ── Safety section ── */
+  .safety-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 64px; }
+  @media (max-width: 560px) { .safety-grid { grid-template-columns: 1fr; } }
+  .safety-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .safety-item svg { flex-shrink: 0; margin-top: 2px; }
+  .safety-item p { font-size: 13.5px; color: var(--text); }
+  .safety-item span { color: var(--muted); font-size: 12.5px; display: block; margin-top: 3px; }
+
+  /* ── Code block ── */
+  .code-wrap {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 64px;
+    overflow-x: auto;
+  }
+  .code-label { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 14px; }
+  pre { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; line-height: 1.75; white-space: pre; }
+  .k  { color: #a78bfa; }
+  .s  { color: var(--accent2); }
+  .n  { color: var(--accent3); }
+  .c  { color: var(--muted); }
+  .p  { color: var(--accent); }
+
+  /* ── Stat row ── */
+  .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 64px; }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    min-width: 130px;
+  }
+  .stat-num { font-size: 26px; font-weight: 700; color: #fff; line-height: 1; }
+  .stat-num span { font-size: 14px; color: var(--accent); }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+  /* ── Footer ── */
+  .footer { border-top: 1px solid var(--border); padding-top: 24px; color: var(--muted); font-size: 13px; }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>QueueStorm <span>Investigator</span></h1>
+    <p>How the service reads a support ticket, reasons from transaction evidence, and produces a safe, routed response.</p>
+    <div class="badge">Deterministic · No LLM · &lt;100 ms</div>
+  </div>
+
+  <!-- Stats -->
+  <p class="section-title">At a glance</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-num">&lt;100<span>ms</span></div><div class="stat-label">response time</div></div>
+    <div class="stat"><div class="stat-num">5</div><div class="stat-label">pipeline steps</div></div>
+    <div class="stat"><div class="stat-num">8</div><div class="stat-label">case types</div></div>
+    <div class="stat"><div class="stat-num">102</div><div class="stat-label">automated tests</div></div>
+    <div class="stat"><div class="stat-num">$0</div><div class="stat-label">inference cost</div></div>
+  </div>
+
+  <!-- Flow diagram -->
+  <p class="section-title">Request flow</p>
+  <div class="diagram-wrap">
+    <svg width="780" height="100" viewBox="0 0 780 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+          <path d="M0,0 L0,7 L8,3.5 Z" fill="#2a2f3f"/>
+        </marker>
+      </defs>
+      <!-- boxes -->
+      <!-- 1 Client -->
+      <rect x="0"   y="28" width="110" height="44" rx="8" fill="#181c27" stroke="#2a2f3f"/>
+      <text x="55"  y="46" text-anchor="middle" fill="#7a8099" font-size="10" font-family="sans-serif" font-weight="600" letter-spacing=".5">CLIENT</text>
+      <text x="55"  y="62" text-anchor="middle" fill="#e2e6f0" font-size="12" font-family="sans-serif">POST /analyze-ticket</text>
+      <!-- arrow -->
+      <line x1="110" y1="50" x2="126" y2="50" stroke="#2a2f3f" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- 2 Validate -->
+      <rect x="128" y="28" width="100" height="44" rx="8" fill="#181c27" stroke="#4f8ef7" stroke-opacity=".4"/>
+      <text x="178" y="46" text-anchor="middle" fill="#7a8099" font-size="10" font-family="sans-serif" font-weight="600" letter-spacing=".5">STEP 1</text>
+      <text x="178" y="62" text-anchor="middle" fill="#4f8ef7" font-size="12" font-family="sans-serif">Validate</text>
+      <!-- arrow -->
+      <line x1="228" y1="50" x2="244" y2="50" stroke="#2a2f3f" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- 3 Classify -->
+      <rect x="246" y="28" width="100" height="44" rx="8" fill="#181c27" stroke="#38d9a9" stroke-opacity=".4"/>
+      <text x="296" y="46" text-anchor="middle" fill="#7a8099" font-size="10" font-family="sans-serif" font-weight="600" letter-spacing=".5">STEP 2</text>
+      <text x="296" y="62" text-anchor="middle" fill="#38d9a9" font-size="12" font-family="sans-serif">Classify</text>
+      <!-- arrow -->
+      <line x1="346" y1="50" x2="362" y2="50" stroke="#2a2f3f" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- 4 Evidence -->
+      <rect x="364" y="28" width="100" height="44" rx="8" fill="#181c27" stroke="#f7c94f" stroke-opacity=".4"/>
+      <text x="414" y="46" text-anchor="middle" fill="#7a8099" font-size="10" font-family="sans-serif" font-weight="600" letter-spacing=".5">STEP 3–4</text>
+      <text x="414" y="62" text-anchor="middle" fill="#f7c94f" font-size="12" font-family="sans-serif">Evidence + Route</text>
+      <!-- arrow -->
+      <line x1="464" y1="50" x2="480" y2="50" stroke="#2a2f3f" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- 5 Safety -->
+      <rect x="482" y="28" width="100" height="44" rx="8" fill="#181c27" stroke="#a78bfa" stroke-opacity=".4"/>
+      <text x="532" y="46" text-anchor="middle" fill="#7a8099" font-size="10" font-family="sans-serif" font-weight="600" letter-spacing=".5">STEP 5</text>
+      <text x="532" y="62" text-anchor="middle" fill="#a78bfa" font-size="12" font-family="sans-serif">Safety scan</text>
+      <!-- arrow -->
+      <line x1="582" y1="50" x2="598" y2="50" stroke="#2a2f3f" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- 6 Response -->
+      <rect x="600" y="28" width="110" height="44" rx="8" fill="#181c27" stroke="#f75f5f" stroke-opacity=".4"/>
+      <text x="655" y="46" text-anchor="middle" fill="#7a8099" font-size="10" font-family="sans-serif" font-weight="600" letter-spacing=".5">OUTPUT</text>
+      <text x="655" y="62" text-anchor="middle" fill="#f75f5f" font-size="12" font-family="sans-serif">JSON Response</text>
+
+      <!-- latency label -->
+      <text x="390" y="96" text-anchor="middle" fill="#2a2f3f" font-size="11" font-family="sans-serif">— entire pipeline runs in under 100 ms —</text>
+    </svg>
+  </div>
+
+  <!-- Pipeline steps -->
+  <p class="section-title">Pipeline steps</p>
+  <div class="pipeline">
+
+    <div class="step s1">
+      <div class="step-line"><div class="step-num">1</div></div>
+      <div class="step-body">
+        <h3>Complaint Classification</h3>
+        <p>The complaint text is normalised (Bangla digits converted, lower-cased) and scanned for keywords in both English and Bangla. Safety-critical types are evaluated first so a phishing attempt is never misrouted as a billing issue.</p>
+        <div class="step-tags">
+          <span class="tag">wrong_transfer</span>
+          <span class="tag">payment_failed</span>
+          <span class="tag">duplicate_payment</span>
+          <span class="tag">phishing_or_social_engineering</span>
+          <span class="tag">refund_request</span>
+          <span class="tag">agent_cash_in_issue</span>
+          <span class="tag">merchant_settlement_delay</span>
+          <span class="tag">other</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step s2">
+      <div class="step-line"><div class="step-num">2</div></div>
+      <div class="step-body">
+        <h3>Transaction Matching</h3>
+        <p>Amounts are extracted from the complaint — including shorthand like <code style="color:var(--accent2);background:rgba(56,217,169,.08);padding:1px 6px;border-radius:4px;font-size:12px">5k</code>, <code style="color:var(--accent2);background:rgba(56,217,169,.08);padding:1px 6px;border-radius:4px;font-size:12px">5 thousand</code>, or <code style="color:var(--accent2);background:rgba(56,217,169,.08);padding:1px 6px;border-radius:4px;font-size:12px">৫ লাখ</code> — then intersected against the transaction history. Long digit strings (phone numbers) are excluded so a counterparty number is never mistaken for a payment amount. The best-matching transaction becomes <code style="color:var(--accent2);background:rgba(56,217,169,.08);padding:1px 6px;border-radius:4px;font-size:12px">relevant_transaction_id</code>.</p>
+      </div>
+    </div>
+
+    <div class="step s3">
+      <div class="step-line"><div class="step-num">3</div></div>
+      <div class="step-body">
+        <h3>Evidence Verdict</h3>
+        <p>The matched transaction's ledger status is compared against what the complaint claims. The service does not guess when evidence is absent or ambiguous — it returns <code style="color:var(--accent3);background:rgba(247,201,79,.08);padding:1px 6px;border-radius:4px;font-size:12px">insufficient_data</code> and asks for clarification.</p>
+      </div>
+    </div>
+
+    <div class="step s4">
+      <div class="step-line"><div class="step-num">4</div></div>
+      <div class="step-body">
+        <h3>Routing &amp; Escalation</h3>
+        <p>Department, severity, and <code style="color:#a78bfa;background:rgba(167,139,250,.08);padding:1px 6px;border-radius:4px;font-size:12px">human_review_required</code> are assigned by deterministic rules. Disputes, fraud, and duplicates escalate to human review. Cases with no matched transaction prompt the agent to collect more detail rather than escalating prematurely.</p>
+        <div class="step-tags">
+          <span class="tag">dispute_resolution</span>
+          <span class="tag">payments_ops</span>
+          <span class="tag">fraud_risk</span>
+          <span class="tag">agent_operations</span>
+          <span class="tag">merchant_operations</span>
+          <span class="tag">customer_support</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step s5">
+      <div class="step-line"><div class="step-num">5</div></div>
+      <div class="step-body">
+        <h3>Safe Response Generation</h3>
+        <p>Agent summary, recommended next action, and customer reply are produced from safe pre-written templates — complaint text is never copied into output fields, making the service structurally immune to prompt injection. Every generated string then passes through an independent safety scan before being returned.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Evidence verdicts -->
+  <p class="section-title">Evidence verdicts</p>
+  <div class="cards">
+    <div class="card card-consistent">
+      <div class="card-label">consistent</div>
+      <h4>Data supports the claim</h4>
+      <p>A matching transaction exists and its ledger status aligns with what the customer reports (e.g. a failed payment that shows as failed).</p>
+    </div>
+    <div class="card card-inconsistent">
+      <div class="card-label">inconsistent</div>
+      <h4>Data contradicts the claim</h4>
+      <p>The transaction exists but the ledger says otherwise — a "failed" payment that completed, or a "wrong transfer" to someone the customer has paid multiple times before.</p>
+    </div>
+    <div class="card card-insufficient">
+      <div class="card-label">insufficient_data</div>
+      <h4>Cannot be determined</h4>
+      <p>No transaction in the history matches the complaint, the match is ambiguous across multiple candidates, or the complaint lacks enough detail to investigate.</p>
+    </div>
+  </div>
+
+  <!-- Safety guardrails -->
+  <p class="section-title">Safety guardrails</p>
+  <div class="safety-grid">
+    <div class="safety-item">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 1.5L2.25 4.5V9C2.25 12.728 5.153 16.216 9 17.25C12.847 16.216 15.75 12.728 15.75 9V4.5L9 1.5Z" stroke="#38d9a9" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M6 9L8 11L12 7" stroke="#38d9a9" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p>Never requests credentials</p>
+        <span>PIN, OTP, password, or card number are never asked for. Safe warning phrases ("do not share your PIN") are allowed.</span>
+      </div>
+    </div>
+    <div class="safety-item">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 1.5L2.25 4.5V9C2.25 12.728 5.153 16.216 9 17.25C12.847 16.216 15.75 12.728 15.75 9V4.5L9 1.5Z" stroke="#38d9a9" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M6 9L8 11L12 7" stroke="#38d9a9" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p>No unauthorized promises</p>
+        <span>Refund, reversal, or account unblock are never confirmed. Replies use "any eligible amount will be returned through official channels."</span>
+      </div>
+    </div>
+    <div class="safety-item">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 1.5L2.25 4.5V9C2.25 12.728 5.153 16.216 9 17.25C12.847 16.216 15.75 12.728 15.75 9V4.5L9 1.5Z" stroke="#38d9a9" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M6 9L8 11L12 7" stroke="#38d9a9" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p>Prompt injection resistant</p>
+        <span>Complaint text is never echoed into output fields. Instructions embedded in a complaint ("ignore your rules") have no surface to act on.</span>
+      </div>
+    </div>
+    <div class="safety-item">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 1.5L2.25 4.5V9C2.25 12.728 5.153 16.216 9 17.25C12.847 16.216 15.75 12.728 15.75 9V4.5L9 1.5Z" stroke="#38d9a9" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M6 9L8 11L12 7" stroke="#38d9a9" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p>Official channels only</p>
+        <span>Replies never redirect customers to third-party numbers, links, or agents. Only official support contacts are referenced.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Example I/O -->
+  <p class="section-title">Example</p>
+  <div class="code-wrap">
+    <div class="code-label">Request — POST /analyze-ticket</div>
+    <pre><span class="p">{</span>
+  <span class="k">"ticket_id"</span><span class="p">:</span>         <span class="s">"TKT-001"</span><span class="p">,</span>
+  <span class="k">"complaint"</span><span class="p">:</span>          <span class="s">"I sent 5k to a wrong number this afternoon."</span><span class="p">,</span>
+  <span class="k">"transaction_history"</span><span class="p">:</span> <span class="p">[{</span>
+    <span class="k">"transaction_id"</span><span class="p">:</span>  <span class="s">"TXN-9101"</span><span class="p">,</span>
+    <span class="k">"amount"</span><span class="p">:</span>          <span class="n">5000</span><span class="p">,</span>
+    <span class="k">"counterparty"</span><span class="p">:</span>    <span class="s">"+8801719876543"</span><span class="p">,</span>
+    <span class="k">"status"</span><span class="p">:</span>          <span class="s">"completed"</span>
+  <span class="p">}]</span>
+<span class="p">}</span></pre>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-label">Response — 200 OK</div>
+    <pre><span class="p">{</span>
+  <span class="k">"ticket_id"</span><span class="p">:</span>               <span class="s">"TKT-001"</span><span class="p">,</span>
+  <span class="k">"relevant_transaction_id"</span><span class="p">:</span> <span class="s">"TXN-9101"</span><span class="p">,</span>   <span class="c">// matched "5k" → 5000</span>
+  <span class="k">"evidence_verdict"</span><span class="p">:</span>        <span class="s">"consistent"</span><span class="p">,</span>  <span class="c">// completed transfer found</span>
+  <span class="k">"case_type"</span><span class="p">:</span>               <span class="s">"wrong_transfer"</span><span class="p">,</span>
+  <span class="k">"severity"</span><span class="p">:</span>                <span class="s">"high"</span><span class="p">,</span>
+  <span class="k">"department"</span><span class="p">:</span>              <span class="s">"dispute_resolution"</span><span class="p">,</span>
+  <span class="k">"human_review_required"</span><span class="p">:</span>   <span class="n">true</span><span class="p">,</span>
+  <span class="k">"confidence"</span><span class="p">:</span>              <span class="n">0.9</span><span class="p">,</span>
+  <span class="k">"agent_summary"</span><span class="p">:</span>           <span class="s">"Customer reports TXN-9101 was sent to wrong recipient."</span><span class="p">,</span>
+  <span class="k">"customer_reply"</span><span class="p">:</span>          <span class="s">"We have noted your concern about TXN-9101..."</span>
+<span class="p">}</span></pre>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>QueueStorm Investigator &nbsp;·&nbsp; <a href="https://chatbot-backend-production-7fe7.up.railway.app/health">Live service</a> &nbsp;·&nbsp; <a href="https://hub.docker.com/r/maruf52230/queuestorm-investigator">Docker Hub</a></p>
+  </div>
+
+</div>
+</body>
+</html>
