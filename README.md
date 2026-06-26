@@ -1,15 +1,13 @@
-# QueueStorm Investigator — AI/API SupportOps Service
+# QueueStorm Investigator — Support Ticket Analysis API
 
-An evidence-grounded support copilot for the **bKash · SUST CSE Carnival 2026 — Codex
-Community Hackathon** (AI/API SupportOps Challenge). It exposes a small FastAPI service
-that reads one customer complaint plus that customer's recent transaction history,
-decides **what actually happened**, routes the case to the right team, and drafts a
-**safe** reply — returning spec-exact JSON within the 30-second budget.
+A small, fast service that helps digital-finance support teams triage complaints. It reads
+one customer complaint plus that customer's recent transaction history, decides **what
+actually happened**, routes the case to the right team, and drafts a **safe** reply —
+returning structured JSON in milliseconds.
 
-> The solution is a complaint *investigator*, not a classifier. The complaint says one
-> thing; the transaction data may say another. The service reasons from the supplied
-> evidence and, when the evidence is genuinely unclear, says so (`insufficient_data`)
-> instead of guessing.
+> It's a complaint *investigator*, not a classifier. The complaint says one thing; the
+> transaction data may say another. The service reasons from the supplied evidence and,
+> when the evidence is genuinely unclear, says so (`insufficient_data`) instead of guessing.
 
 ---
 
@@ -33,12 +31,12 @@ curl -s https://chatbot-backend-production-7fe7.up.railway.app/analyze-ticket \
 
 ---
 
-## Endpoints (problem.md §4)
+## Endpoints
 
 | Method | Path              | Purpose                                                        |
 |--------|-------------------|----------------------------------------------------------------|
 | `GET`  | `/health`         | Readiness probe. Returns exactly `{"status":"ok"}`, no I/O.    |
-| `POST` | `/analyze-ticket` | Analyse one ticket; returns the structured response (§6).      |
+| `POST` | `/analyze-ticket` | Analyse one ticket; returns the structured response.           |
 
 HTTP codes: `200` success · `400` malformed input (invalid JSON / missing required
 fields) · `422` schema-valid but semantically empty complaint · `500` internal error
@@ -73,23 +71,22 @@ curl -s http://localhost:8000/analyze-ticket -H "Content-Type: application/json"
 }
 ```
 
-A full set of outputs for all 10 public sample cases is checked in at
-[`sample_output.json`](./sample_output.json).
+A set of example outputs is checked in at [`sample_output.json`](./sample_output.json).
 
 ---
 
 ## Tech stack
 
 - **Python 3.12+ / FastAPI / Uvicorn** — async HTTP service.
-- **Pydantic v2** — request/response schema with the exact spec enums as `Literal`
-  types, so an illegal enum value can never be serialised.
-- **Pytest** — 102 tests: contract, the 10 sample cases, reasoning robustness, safety, and reliability.
+- **Pydantic v2** — request/response schema with the output enums as `Literal` types, so an
+  illegal enum value can never be serialised.
+- **Pytest** — 102 tests: contract, reasoning, robustness, safety, and reliability.
 - No database, no GPU, and **no required outbound network call** on the analysis path.
 
-## AI approach — how it reasons
+## How it reasons
 
 The reasoning is a **deterministic rule engine** (`backend/app/reasoning.py`), not a
-free-form LLM, calibrated against the 10 public sample cases:
+free-form LLM:
 
 1. **Classify** the case type from complaint keywords (English + Bangla), with
    safety-critical types (phishing) checked first.
@@ -105,60 +102,53 @@ free-form LLM, calibrated against the 10 public sample cases:
    that never left via a `failed`/`reversed` entry); `insufficient_data` when no
    transaction matches, the match is ambiguous, or the complaint is vague. **When unsure,
    it does not guess.**
-4. **Route** deterministically to the department per §7.2, assign severity, and decide
+4. **Route** deterministically to the right department, assign severity, and decide
    `human_review_required` (escalate disputes/fraud/duplicates; ask for clarification
    rather than escalate when the transaction can't even be identified).
 5. **Draft prose** from safe templates, multilingual (Bangla reply for Bangla input).
 
-Why deterministic? It guarantees **enum-exact** output, **sub-millisecond** latency
-(no timeout risk), and **reproducible safety** — none of which an LLM guarantees. The
-problem statement is explicit that an LLM is not required to score well (§12), and no
-LLM credits are provided.
+Why deterministic? It guarantees **enum-exact** output, **sub-millisecond** latency, and
+**reproducible safety** — none of which a free-form LLM guarantees — at zero inference cost.
 
-## Safety logic (problem.md §8)
+## Safety logic
 
-Every customer-facing string passes through `backend/app/safety.py`, which enforces the
-four auto-checked rules as defense-in-depth on top of already-safe templates:
+Every customer-facing string passes through `backend/app/safety.py`, which enforces these
+rules as defense-in-depth on top of already-safe templates:
 
-| Rule | Penalty | How it's enforced |
-|------|---------|-------------------|
-| Never request PIN / OTP / password / full card | −15 | Reply scanned for solicitation patterns; warning phrasings ("do not share your PIN") are explicitly allowed. Credentials in the complaint are never echoed back. |
-| Never confirm an unauthorized refund / reversal / unblock | −10 | Guaranteeing language ("we will refund you") is replaced with "any eligible amount will be returned through official channels". Applies to `customer_reply` **and** `recommended_next_action`. |
-| Never direct to a suspicious third party | −10 | Replies only ever point to official support channels. |
-| Ignore prompt injection in the complaint | rule | The engine never copies complaint text into output fields, so embedded "ignore your rules" instructions have no surface to act on. |
+| Rule | How it's enforced |
+|------|-------------------|
+| Never request PIN / OTP / password / full card | Reply scanned for solicitation patterns; warning phrasings ("do not share your PIN") are explicitly allowed. Credentials in the complaint are never echoed back. |
+| Never confirm an unauthorized refund / reversal / unblock | Guaranteeing language ("we will refund you") is replaced with "any eligible amount will be returned through official channels". Applies to `customer_reply` **and** `recommended_next_action`. |
+| Never direct to a suspicious third party | Replies only ever point to official support channels. |
+| Ignore prompt injection in the complaint | The engine never copies complaint text into output fields, so embedded "ignore your rules" instructions have no surface to act on. |
 
 These rules are covered by `tests/safety/` with explicit negative tests.
 
-## Model & cost reasoning (MODELS)
+## Models & cost
 
-**No external LLM is used on the scoring path.** The service runs a self-contained,
-deterministic rule engine:
+**No external LLM is used.** The service runs a self-contained, deterministic rule engine:
 
-- **Cost:** $0 inference cost — no API credits required, no per-request token spend.
-- **Latency:** every sample case responds in well under a second (see
-  `tests/reliability/test_analyze_latency_under_budget`), comfortably inside the 30s
-  budget with no timeout exposure.
-- **No outbound calls:** the analysis path makes no network request at all, so there is
-  no API key to manage and no external dependency that can fail or add latency.
+- **Cost:** $0 inference cost — no API keys, no per-request token spend.
+- **Latency:** every request responds in well under a second (see
+  `tests/reliability/test_analyze_latency_under_budget`).
+- **No outbound calls:** the analysis path makes no network request at all, so there is no
+  external dependency that can fail or add latency.
 
-## Assumptions
+## Design notes
 
-- "Comparable severity" is the bar (per the sample pack), not exact-match severity;
-  thresholds are calibrated to the 10 sample rationales.
-- A refund complaint is routed to `dispute_resolution` only when the evidence
-  contradicts the customer (contested); ordinary change-of-mind refunds go to
-  `customer_support`.
+- A refund complaint is routed to `dispute_resolution` only when the evidence contradicts
+  the customer (contested); ordinary change-of-mind refunds go to `customer_support`.
 - The relevant transaction is the one whose amount the complaint names; for a duplicate
   group (same amount + counterparty), the most recent transaction is the suspected duplicate.
+- Severity uses comparable bands rather than a single rigid value per case type.
 
 ## Known limitations
 
-- Amount matching needs a number; digit forms, magnitude units (`5k`, `৫ লাখ`), and
-  Bangla numerals are handled, but a fully spelled-out amount with no digit ("five
-  thousand") falls back to `insufficient_data` rather than guess — a deliberately safe
-  failure mode.
-- The rule engine is tuned to the public taxonomy; genuinely novel hidden scenarios map
-  to `other` / `customer_support` with `insufficient_data`, which is safe but conservative.
+- Amount matching needs a number; digit forms, magnitude units (`5k`, `৫ লাখ`), and Bangla
+  numerals are handled, but a fully spelled-out amount with no digit ("five thousand")
+  falls back to `insufficient_data` rather than guess — a deliberately safe failure mode.
+- The rule engine covers the supported taxonomy; cases outside it map to `other` /
+  `customer_support` with `insufficient_data`, which is safe but conservative.
 - Bangla prose uses fixed templates rather than generative phrasing.
 
 ---
@@ -168,8 +158,6 @@ deterministic rule engine:
 Three ways, fastest first. The full copy-paste reference lives in [`RUNBOOK.md`](./RUNBOOK.md).
 
 ### 1. Use the live service (nothing to install)
-
-Already deployed on Railway — just call it:
 
 ```bash
 curl https://chatbot-backend-production-7fe7.up.railway.app/health
@@ -196,10 +184,10 @@ docker compose up --build          # add -d to detach;  docker compose down to s
 HOST_PORT=8090 docker compose up   # if port 8000 is taken
 ```
 
-The image (`python:3.12-slim`, well under the 5 GB guidance, no models baked in) runs as a
-**non-root** user, ships a `HEALTHCHECK` on `/health`, and starts **2 uvicorn workers**
-(matching the preferred 2-vCPU profile, §9). Knobs — all optional, all with safe defaults:
-`CORS_ORIGINS` (default `*`), `WEB_CONCURRENCY` (workers, default `2`), `PORT`, `HOST_PORT`.
+The image (`python:3.12-slim`, small, no models baked in) runs as a **non-root** user,
+ships a `HEALTHCHECK` on `/health`, and starts **2 uvicorn workers**. Knobs — all optional,
+all with safe defaults: `CORS_ORIGINS` (default `*`), `WEB_CONCURRENCY` (workers, default
+`2`), `PORT`, `HOST_PORT`.
 
 ### 3. Local (Python 3.12+)
 
@@ -214,5 +202,5 @@ Run the tests:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 102 tests: contract, 10 sample cases, reasoning robustness, safety, reliability
+pytest            # 102 tests: contract, reasoning, robustness, safety, reliability
 ```
