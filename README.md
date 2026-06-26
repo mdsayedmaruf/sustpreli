@@ -98,7 +98,7 @@ Returns `{"status":"ok"}` with no I/O. Used as a readiness probe.
 
 ## How it works
 
-> **Visual walkthrough:** [`how-it-works.html`](./how-it-works.html) — an interactive single-page diagram covering the full pipeline, evidence verdicts, safety guardrails, and an annotated example request/response.
+> **Visual walkthrough:** [`how-it-works.md`](./how-it-works.md) — full pipeline diagram, evidence verdicts, safety guardrails, and an annotated example request/response.
 
 The reasoning is fully deterministic — no LLM, no external API call on the analysis path.
 
@@ -245,6 +245,7 @@ backend/
   Dockerfile
 tests/               # 102 Pytest tests
 docker-compose.yml
-RUNBOOK.md           # Copy-paste deployment reference (see also: [how-it-works.html](./how-it-works.html))
+RUNBOOK.md           # Copy-paste deployment reference
+how-it-works.md      # Pipeline walkthrough with diagrams
 sample_output.json   # Example outputs   for all sample cases
 ```
