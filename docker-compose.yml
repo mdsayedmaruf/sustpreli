@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    container_name: chatbot-backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # Falls back to a host env var if backend/.env is absent.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Empty => frontend uses relative /api, which nginx proxies to backend.
+        VITE_API_URL: ""
+    container_name: chatbot-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
