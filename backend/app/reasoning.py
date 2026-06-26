@@ -76,8 +76,9 @@ _KW = {
         "ওটিপি", "পিন", "পাসওয়ার্ড", "প্রতারণা", "ভুয়া", "সন্দেহজনক",
     ],
     "duplicate": [
-        "twice", "two times", "double", "duplicate", "deducted twice", "charged twice",
-        "দুইবার", "দুবার", "ডাবল",
+        "twice", "two times", "2 times", "double", "duplicate", "deducted twice",
+        "charged twice", "three times", "3 times", "thrice", "multiple times",
+        "দুইবার", "দুবার", "তিনবার", "একাধিকবার", "ডাবল",
     ],
     "agent_cash_in": [
         "cash in", "cash-in", "cashin", "cash in agent", "agent", "deposit through",
