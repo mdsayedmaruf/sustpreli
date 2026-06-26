@@ -74,12 +74,17 @@ free-form LLM, calibrated against the 10 public sample cases:
 1. **Classify** the case type from complaint keywords (English + Bangla), with
    safety-critical types (phishing) checked first.
 2. **Match evidence** — the customer's named amount is intersected against the supplied
-   `transaction_history` to pick `relevant_transaction_id`. Long digit runs (phone
-   numbers) are excluded so a counterparty number is never mistaken for an amount.
+   `transaction_history` to pick `relevant_transaction_id`. Amounts written with a
+   magnitude unit (`5k`, `5 thousand`, `৫ লাখ`) and Bangla numerals are normalised before
+   matching. Long digit runs (phone numbers) are excluded so a counterparty number is
+   never mistaken for an amount.
 3. **Judge the evidence** — `consistent` when the data supports the complaint;
    `inconsistent` when it contradicts it (e.g. a "wrong transfer" to a recipient the
-   customer has paid repeatedly); `insufficient_data` when no transaction matches, the
-   match is ambiguous, or the complaint is vague. **When unsure, it does not guess.**
+   customer has paid repeatedly, or a claim whose ledger **status** disproves it — a
+   "payment failed" against a `completed` transaction, a "wrong transfer" against money
+   that never left via a `failed`/`reversed` entry); `insufficient_data` when no
+   transaction matches, the match is ambiguous, or the complaint is vague. **When unsure,
+   it does not guess.**
 4. **Route** deterministically to the department per §7.2, assign severity, and decide
    `human_review_required` (escalate disputes/fraud/duplicates; ask for clarification
    rather than escalate when the transaction can't even be identified).
@@ -128,9 +133,10 @@ deterministic rule engine:
 
 ## Known limitations
 
-- Amount matching is exact; a complaint that paraphrases the amount ("around five
-  thousand") without a digit will fall back to `insufficient_data` rather than guess —
-  a deliberately safe failure mode.
+- Amount matching needs a number; digit forms, magnitude units (`5k`, `৫ লাখ`), and
+  Bangla numerals are handled, but a fully spelled-out amount with no digit ("five
+  thousand") falls back to `insufficient_data` rather than guess — a deliberately safe
+  failure mode.
 - The rule engine is tuned to the public taxonomy; genuinely novel hidden scenarios map
   to `other` / `customer_support` with `insufficient_data`, which is safe but conservative.
 - Bangla prose uses fixed templates rather than generative phrasing.

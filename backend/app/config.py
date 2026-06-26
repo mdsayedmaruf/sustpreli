@@ -24,6 +24,15 @@ class Settings(BaseSettings):
             return ["*"]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    def cors_allow_credentials(self) -> bool:
+        """Credentials cannot be combined with a wildcard origin.
+
+        Browsers reject ``Access-Control-Allow-Origin: *`` together with
+        ``Allow-Credentials: true``; enabling it is also a security smell. We
+        only allow credentials when a concrete origin allowlist is configured.
+        """
+        return self.cors_origins.strip() != "*"
+
 
 @lru_cache
 def get_settings() -> Settings:

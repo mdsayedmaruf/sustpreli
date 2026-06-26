@@ -44,16 +44,43 @@ def _is_bangla(req: AnalyzeTicketRequest) -> bool:
     return any("ঀ" <= ch <= "৿" for ch in req.complaint)
 
 
+# Magnitude words customers use instead of trailing zeros, in English, Banglish,
+# and Bangla. The caller intersects results against real transaction amounts, so
+# emitting a few extra candidates is harmless — missing the real amount is not.
+_UNIT_FACTOR = {
+    "k": 1_000, "thousand": 1_000, "hajar": 1_000, "হাজার": 1_000,
+    "lakh": 100_000, "lakhs": 100_000, "lac": 100_000, "lacs": 100_000, "লাখ": 100_000,
+    "million": 1_000_000, "mn": 1_000_000,
+    "crore": 10_000_000, "কোটি": 10_000_000,
+}
+# Longest tokens first so e.g. "lakhs" wins over "lakh" / "lac".
+_AMOUNT_UNIT_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*"
+    r"(thousand|hajar|হাজার|lakhs|lakh|lacs|lac|লাখ|million|crore|কোটি|mn|k)",
+)
+
+
 def _extract_numbers(text: str) -> set[float]:
     """Pull plausible money amounts out of free text.
 
-    We strip thousands separators, then read integer/decimal runs. Long digit
-    runs (>= 7 digits, e.g. phone numbers like 01712345678) are excluded so a
-    counterparty number is never mistaken for an amount. The caller intersects
-    these against actual transaction amounts, which filters noise further.
+    Handles three shapes the harness is likely to throw: bare digit runs
+    ("5000", "5,000"), magnitude units ("5k", "5 thousand", "৫ লাখ"), and Bangla
+    numerals. Long digit runs (>= 7 digits, e.g. phone numbers like 01712345678)
+    are excluded so a counterparty number is never mistaken for an amount. The
+    caller intersects these against actual transaction amounts, which filters
+    noise further.
     """
     cleaned = _normalize(text).replace(",", "")
     numbers: set[float] = set()
+
+    # Amounts written with a magnitude unit: "5k" -> 5000, "৫ লাখ" -> 500000.
+    for value, unit in _AMOUNT_UNIT_RE.findall(cleaned):
+        try:
+            numbers.add(float(value) * _UNIT_FACTOR[unit])
+        except (ValueError, KeyError):
+            continue
+
+    # Bare digit runs.
     for match in re.findall(r"\d+(?:\.\d+)?", cleaned):
         digits = match.split(".")[0]
         if len(digits) >= 7:  # phone numbers, long ids — not amounts
@@ -220,6 +247,16 @@ def _find_relevant(
     return None, None, "ambiguous"
 
 
+def _status_of(relevant_id: str | None, txns: list[TransactionEntry]) -> str | None:
+    """Normalised ledger status of the matched transaction, if any."""
+    if relevant_id is None:
+        return None
+    matched = next((t for t in txns if t.transaction_id == relevant_id), None)
+    if matched is None or matched.status is None:
+        return None
+    return matched.status.strip().lower()
+
+
 def _established_recipient(relevant_id: str | None, txns: list[TransactionEntry]) -> bool:
     """True when the matched transaction's counterparty appears more than once.
 
@@ -263,11 +300,21 @@ def _decide(req: AnalyzeTicketRequest) -> _Decision:
 
     amounts = _extract_numbers(req.complaint)
     relevant_id, matched_amount, match_reason = _find_relevant(case_type, amounts, txns)
+    matched_status = _status_of(relevant_id, txns)
 
     # ----- evidence verdict -------------------------------------------------
+    # The ledger status of the matched transaction can directly contradict the
+    # complaint (the "investigator" twist, §3): a "payment failed" claim against a
+    # transaction the ledger marks completed, or a "wrong transfer" against money
+    # that never actually left the account (failed/reversed), is inconsistent.
+    status_conflict = (case_type == "payment_failed" and matched_status == "completed") or (
+        case_type == "wrong_transfer" and matched_status in {"failed", "reversed"}
+    )
     if relevant_id is None:
         evidence_verdict = "insufficient_data"
     elif case_type == "wrong_transfer" and _established_recipient(relevant_id, txns):
+        evidence_verdict = "inconsistent"
+    elif status_conflict:
         evidence_verdict = "inconsistent"
     else:
         evidence_verdict = "consistent"
@@ -319,6 +366,8 @@ def _decide(req: AnalyzeTicketRequest) -> _Decision:
         reason_codes.append("needs_clarification")
     if evidence_verdict == "inconsistent":
         reason_codes.append("evidence_inconsistent")
+    if status_conflict:
+        reason_codes.append("ledger_status_conflict")
 
     return _Decision(
         relevant_transaction_id=relevant_id,
@@ -389,9 +438,18 @@ def _prose_en(decision: _Decision) -> tuple[str, str, str]:
             f"the case and contact you through official support channels. {_SAFETY_LINE_EN}",
         )
     if ct == "payment_failed":
+        if decision.evidence_verdict == "inconsistent":
+            summary = (
+                f"Customer reports payment {tid} failed, but the transaction history shows it "
+                f"as completed — the data contradicts the complaint. Flag for human review."
+            )
+        else:
+            summary = (
+                f"Customer attempted a payment ({tid}) that failed but reports the balance was "
+                f"deducted. Requires payments operations investigation."
+            )
         return (
-            f"Customer attempted a payment ({tid}) that failed but reports the balance was "
-            f"deducted. Requires payments operations investigation.",
+            summary,
             f"Investigate the {tid} ledger status. If the balance was deducted on a failed "
             f"payment, initiate the reversal flow within standard SLA.",
             f"We have noted that transaction {tid} may have caused an unexpected balance "
