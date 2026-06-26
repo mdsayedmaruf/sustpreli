@@ -8,13 +8,13 @@ A deterministic API service that triages digital-finance support tickets. Given 
 
 | | |
 |---|---|
-| Base URL | `https://chatbot-backend-production-7fe7.up.railway.app` |
+| Base URL | `https://sustpreli-production-56d0.up.railway.app` |
 | Health | `GET /health` → `{"status":"ok"}` |
 | Analyze | `POST /analyze-ticket` |
 | Docker image | `docker pull maruf52230/queuestorm-investigator:latest` |
 
 ```bash
-curl https://chatbot-backend-production-7fe7.up.railway.app/health
+curl https://sustpreli-production-56d0.up.railway.app/health
 # {"status":"ok"}
 ```
 

@@ -3,7 +3,7 @@
 A stranger can bring this service up by copy-pasting the steps below. The service has
 **no required external dependencies** (no database, no API key) on the analysis path.
 
-> **Live service (no setup):** <https://chatbot-backend-production-7fe7.up.railway.app>
+> **Live service (no setup):** <https://sustpreli-production-56d0.up.railway.app>
 > — `/health` returns `{"status":"ok"}`. Public Docker image:
 > `docker pull maruf52230/queuestorm-investigator:latest`
 
