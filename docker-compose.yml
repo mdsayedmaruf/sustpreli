@@ -1,0 +1,36 @@
+# QueueStorm Investigator — one-command Docker setup.
+#
+#   docker compose up --build        # build + run, foreground
+#   docker compose up -d --build     # detached
+#   docker compose down              # stop and remove
+#
+# The service is self-contained: no database, no API key, no outbound call on the
+# analysis path. The only knobs are environment variables, all with safe defaults.
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: queuestorm-investigator:latest
+    container_name: queuestorm
+    ports:
+      # Host port is configurable to avoid clashes: HOST_PORT=8090 docker compose up
+      - "${HOST_PORT:-8000}:8000"
+    environment:
+      # Port the app binds to (the Dockerfile honours $PORT). Keep in sync with the
+      # published port above.
+      PORT: "8000"
+      # CORS allowlist. "*" allows all origins (credentials are auto-disabled then).
+      CORS_ORIGINS: "*"
+      # Uvicorn workers. 2 matches the preferred 2-vCPU profile (problem.md §9).
+      WEB_CONCURRENCY: "2"
+    restart: unless-stopped
+    # The image already declares a HEALTHCHECK; this mirrors it at the compose layer
+    # so `docker compose ps` reports health and dependents can wait on it.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

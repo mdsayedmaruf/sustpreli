@@ -13,6 +13,26 @@ decides **what actually happened**, routes the case to the right team, and draft
 
 ---
 
+## 🚀 Live service
+
+**Base URL:** <https://chatbot-backend-production-7fe7.up.railway.app>
+
+| | |
+|---|---|
+| **Health**  | <https://chatbot-backend-production-7fe7.up.railway.app/health> → `{"status":"ok"}` |
+| **Analyze** | `POST` https://chatbot-backend-production-7fe7.up.railway.app/analyze-ticket |
+| **Docker**  | `docker pull maruf52230/queuestorm-investigator:latest` |
+
+Try it in one line:
+
+```bash
+curl -s https://chatbot-backend-production-7fe7.up.railway.app/analyze-ticket \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id":"TKT-001","complaint":"I sent 5k to a wrong number","transaction_history":[{"transaction_id":"TXN-9101","amount":5000,"counterparty":"+8801719876543","status":"completed"}]}'
+```
+
+---
+
 ## Endpoints (problem.md §4)
 
 | Method | Path              | Purpose                                                        |
@@ -63,7 +83,7 @@ A full set of outputs for all 10 public sample cases is checked in at
 - **Python 3.12+ / FastAPI / Uvicorn** — async HTTP service.
 - **Pydantic v2** — request/response schema with the exact spec enums as `Literal`
   types, so an illegal enum value can never be serialised.
-- **Pytest** — 92 tests: contract, the 10 sample cases, safety, and reliability.
+- **Pytest** — 102 tests: contract, the 10 sample cases, reasoning robustness, safety, and reliability.
 - No database, no GPU, and **no required outbound network call** on the analysis path.
 
 ## AI approach — how it reasons
@@ -145,7 +165,43 @@ deterministic rule engine:
 
 ## Run it
 
-See [`RUNBOOK.md`](./RUNBOOK.md) for copy-paste local, Docker, and deploy steps.
+Three ways, fastest first. The full copy-paste reference lives in [`RUNBOOK.md`](./RUNBOOK.md).
+
+### 1. Use the live service (nothing to install)
+
+Already deployed on Railway — just call it:
+
+```bash
+curl https://chatbot-backend-production-7fe7.up.railway.app/health
+# {"status":"ok"}
+```
+
+Base URL: `https://chatbot-backend-production-7fe7.up.railway.app`
+
+### 2. Docker — pull the published image (recommended local)
+
+The image is public on Docker Hub, built for `linux/amd64`:
+
+```bash
+docker pull maruf52230/queuestorm-investigator:latest
+docker run --rm -p 8000:8000 maruf52230/queuestorm-investigator:latest
+# GET  http://localhost:8000/health         →  {"status":"ok"}
+# POST http://localhost:8000/analyze-ticket
+```
+
+Prefer one command from source? Use Compose instead:
+
+```bash
+docker compose up --build          # add -d to detach;  docker compose down to stop
+HOST_PORT=8090 docker compose up   # if port 8000 is taken
+```
+
+The image (`python:3.12-slim`, well under the 5 GB guidance, no models baked in) runs as a
+**non-root** user, ships a `HEALTHCHECK` on `/health`, and starts **2 uvicorn workers**
+(matching the preferred 2-vCPU profile, §9). Knobs — all optional, all with safe defaults:
+`CORS_ORIGINS` (default `*`), `WEB_CONCURRENCY` (workers, default `2`), `PORT`, `HOST_PORT`.
+
+### 3. Local (Python 3.12+)
 
 ```bash
 cd backend
@@ -158,5 +214,5 @@ Run the tests:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 92 tests: contract, 10 sample cases, safety, reliability
+pytest            # 102 tests: contract, 10 sample cases, reasoning robustness, safety, reliability
 ```

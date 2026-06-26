@@ -3,6 +3,10 @@
 A stranger can bring this service up by copy-pasting the steps below. The service has
 **no required external dependencies** (no database, no API key) on the analysis path.
 
+> **Live service (no setup):** <https://chatbot-backend-production-7fe7.up.railway.app>
+> — `/health` returns `{"status":"ok"}`. Public Docker image:
+> `docker pull maruf52230/queuestorm-investigator:latest`
+
 ## Requirements
 
 - Python 3.12+ (tested on 3.12–3.14), **or** Docker.
@@ -31,17 +35,50 @@ curl -s http://localhost:8000/analyze-ticket -H "Content-Type: application/json"
 }'
 ```
 
-## Option B — Docker
+## Option B — Docker (recommended)
+
+**Pull the published image (no build needed):**
 
 ```bash
-cd backend
-docker build -t queuestorm-investigator .
-docker run --rm -p 8000:8000 queuestorm-investigator
+docker pull maruf52230/queuestorm-investigator:latest
+docker run --rm -p 8000:8000 maruf52230/queuestorm-investigator:latest
 # /health and /analyze-ticket now respond on http://localhost:8000
 ```
 
-The image is based on `python:3.12-slim` and stays well under the 5 GB guidance; no
-models are baked in.
+**With Docker Compose (build from source, one command, from the repo root):**
+
+```bash
+docker compose up --build          # foreground; Ctrl+C to stop
+docker compose up -d --build       # detached
+docker compose down                # stop and remove
+# /health and /analyze-ticket now respond on http://localhost:8000
+```
+
+If port 8000 is already in use on your host, publish a different one:
+
+```bash
+HOST_PORT=8090 docker compose up --build   # now on http://localhost:8090
+```
+
+**Without Compose (plain Docker):**
+
+```bash
+docker build -t queuestorm-investigator ./backend
+docker run --rm -p 8000:8000 queuestorm-investigator
+```
+
+The image is based on `python:3.12-slim` and stays well under the 5 GB guidance; no models
+are baked in. It runs as a **non-root** user, declares a `HEALTHCHECK` on `/health`, and
+starts **2 uvicorn workers** by default (override with `-e WEB_CONCURRENCY=4`).
+
+Configuration (all optional, all default to a working LLM-free setup):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CORS_ORIGINS` | `*` | Comma-separated allowlist, or `*`. Credentials are auto-disabled with `*`. |
+| `WEB_CONCURRENCY` | `2` | Number of uvicorn workers. |
+| `PORT` | `8000` | Port the app binds inside the container (most PaaS inject this). |
+| `HOST_PORT` | `8000` | Host port published by `docker compose` (compose only). |
 
 ## Option C — Deploy (Render / Railway / Fly / any PaaS)
 
@@ -59,7 +96,7 @@ No environment variables are required to run. Optional ones are listed in
 # from repo root
 pip install -r backend/requirements.txt -r requirements-dev.txt
 pytest
-# 92 passed  (contract, 10 sample cases, safety, reliability)
+# 102 passed  (contract, 10 sample cases, reasoning robustness, safety, reliability)
 ```
 
 ## Troubleshooting
