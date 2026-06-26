@@ -4,6 +4,19 @@ A deterministic API service that triages digital-finance support tickets. Given 
 
 ---
 
+## Why it's built differently
+
+| | |
+|---|---|
+| **Sub-100 ms response** | Pure in-memory rule engine — no database query, no network call, no model inference on the critical path. Every request is resolved in a single synchronous pass over a handful of transactions. |
+| **Horizontally scalable** | Completely stateless. No shared mutable state, no session, no cache to synchronise. Scaling from 1 to 100 replicas is a one-line config change — throughput grows linearly with replicas. |
+| **Built-in safety layer** | Every customer-facing field is independently scanned before it leaves the service. Credential solicitation, unauthorised refund promises, third-party redirects, and prompt injection are blocked structurally — not by prompt wording. |
+| **Zero inference cost** | No LLM, no API key, no per-request token spend. The service runs on the free tier of any container host and costs nothing to scale. |
+| **Crash-proof input handling** | Malformed JSON, missing fields, empty complaints, and adversarial payloads all return clean error responses. The process never terminates on bad input. |
+| **Multilingual** | Complaints in English, Bangla, and Banglish are handled natively. Bangla numerals and amount shorthand (`৫ লাখ`, `5k`) are normalised before matching. |
+
+---
+
 ## Live service
 
 | | |
